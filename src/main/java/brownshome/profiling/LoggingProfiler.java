@@ -6,10 +6,11 @@ import java.util.HashMap;
 import java.util.Objects;
 
 /**
- * A sink for profiling data that logs a list of times taken every period. This implementation uses {@see System.Logger}
+ * A profiler that logs profiling data at most, every period. This implementation uses {@see System.Logger} and logs on
+ * the close of sections.
  */
-public final class LoggingProfilingDataSink implements ProfilingDataSink {
-	private static final System.Logger LOGGER = System.getLogger(LoggingProfilingDataSink.class.getModule().toString());
+public final class LoggingProfiler extends StackProfiler {
+	private static final System.Logger LOGGER = System.getLogger(LoggingProfiler.class.getModule().toString());
 
 	private Instant lastLog = Instant.now();
 	private final Duration period;
@@ -57,16 +58,21 @@ public final class LoggingProfilingDataSink implements ProfilingDataSink {
 	 * @param period the period to log at
 	 * @param level the level to log at
 	 */
-	public LoggingProfilingDataSink(Duration period, System.Logger.Level level) {
+	public LoggingProfiler(Duration period, System.Logger.Level level) {
 		this.period = period;
 		this.level = level;
 	}
 
 	@Override
-	public void accept(Profiler profiler, Duration duration) {
-		var marker = profiler.currentSection();
+	protected long time() {
+		return System.nanoTime();
+	}
 
-		accumulatedDurations.computeIfAbsent(marker, MarkerStats::new).add(duration);
+	@Override
+	protected void sectionEnded(long duration) {
+		var marker = currentSection();
+
+		accumulatedDurations.computeIfAbsent(marker, MarkerStats::new).add(Duration.ofNanos(duration));
 
 		var now = Instant.now();
 		if (lastLog.plus(period).isBefore(now)) {

@@ -1,37 +1,13 @@
 package brownshome.profiling;
 
-import java.time.Duration;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
-import java.util.function.Supplier;
 
-abstract class LongProfiler implements Profiler {
-	static class DefaultProfiler extends LongProfiler {
-		private static volatile Supplier<ProfilingDataSink> DEFAULT_DATA_SINK_SUPPLIER = () -> ProfilingDataSink.NULL;
-
-		private ProfilingDataSink profilingDataSink = DEFAULT_DATA_SINK_SUPPLIER.get();
-
-		static void setDefaultDataSink(Supplier<ProfilingDataSink> sink) {
-			DEFAULT_DATA_SINK_SUPPLIER = sink;
-		}
-
-		void setDataSink(ProfilingDataSink sink) {
-			profilingDataSink = sink;
-		}
-
-		@Override
-		void sectionEnded(long duration) {
-			profilingDataSink.accept(this, Duration.ofNanos(duration));
-		}
-
-		@Override
-		long time() {
-			return System.nanoTime();
-		}
-	}
-
-	static final ThreadLocal<DefaultProfiler> DEFAULT_PROFILER = ThreadLocal.withInitial(DefaultProfiler::new);
-
+/**
+ * An implementation of a profiler that tracks a stack of marked sections. Implementors will need to provide a clock
+ * implementation and a way of handling closed frames.
+ */
+public abstract class StackProfiler implements Profiler {
 	private final class Section {
 		final Marker marker;
 		final long start;
@@ -52,8 +28,21 @@ abstract class LongProfiler implements Profiler {
 
 	private Section currentSection;
 
-	abstract void sectionEnded(long duration);
-	abstract long time();
+	/**
+	 * Handles when a section closes. Note, this is called on the same thread that just
+	 * closed the section.
+	 *
+	 * @param duration the duration of that section.
+	 */
+	protected abstract void sectionEnded(long duration);
+
+	/**
+	 * Gets the current time. The difference between timestamps is used as the duration value in {@see sectionEnded}, but
+	 * the exact meaning of the values is left up to the implementor.
+	 *
+	 * @return the current time
+	 */
+	protected abstract long time();
 
 	@Override
 	public Profiler start(Marker marker) {

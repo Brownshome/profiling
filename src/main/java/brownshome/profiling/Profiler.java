@@ -1,17 +1,60 @@
 package brownshome.profiling;
 
 import java.util.Iterator;
+import java.util.function.Supplier;
+
+class ProfilerThreadLocal extends ThreadLocal<Profiler> {
+	private static final ProfilerThreadLocal INSTANCE = new ProfilerThreadLocal();
+	private Supplier<? extends Profiler> supplier = NullProfiler::instance;
+
+	static void setProfiler(Supplier<? extends Profiler> profiler) {
+		INSTANCE.supplier = profiler;
+	}
+
+	static ProfilerThreadLocal instance() {
+		return INSTANCE;
+	}
+
+	@Override
+	protected Profiler initialValue() {
+		var result = supplier.get();
+
+		assert result != null;
+
+		return result;
+	}
+}
 
 /**
  * A store of profiling data. This class tracks entrances and exits from method calls
  */
 public interface Profiler extends Iterable<Marker>, AutoCloseable {
 	/**
+	 * Sets the default profiler for all threads that have not yet called {@see thread}
+	 * @param profiler a supplier to use for new profilers. This must not be null, or return null.
+	 */
+	static void setDefaultProfiler(Supplier<? extends Profiler> profiler) {
+		assert profiler != null;
+
+		ProfilerThreadLocal.setProfiler(profiler);
+	}
+
+	/**
+	 * Sets the profiler for this thread, all data in the old profiler are lost
+	 * @param profiler the new profiler, this must not be null
+	 */
+	static void setProfiler(Profiler profiler) {
+		assert profiler != null;
+
+		ProfilerThreadLocal.instance().set(profiler);
+	}
+
+	/**
 	 * A profiler for this thread. This will be unique to the calling thread
 	 * @return the profiler specific to this thread
 	 */
 	static Profiler thread() {
-		return LongProfiler.DefaultProfiler.DEFAULT_PROFILER.get();
+		return ProfilerThreadLocal.instance().get();
 	}
 
 	/**
