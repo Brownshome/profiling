@@ -1,6 +1,7 @@
 package brownshome.profiling;
 
 import java.util.Iterator;
+import java.util.Objects;
 import java.util.function.Supplier;
 
 class ProfilerThreadLocal extends ThreadLocal<Profiler> {
@@ -104,7 +105,7 @@ public interface Profiler extends Iterable<Marker>, AutoCloseable {
 	 * @param marker the marker to close until
 	 */
 	default void closeUntil(Marker marker) {
-		while (currentSection() != marker) {
+		while (!Objects.equals(currentSection(), marker)) {
 			close();
 		}
 	}
